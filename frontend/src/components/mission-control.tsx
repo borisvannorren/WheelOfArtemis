@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { errorMessage, type Round, roundsApi, type TeamMember, teamMembersApi } from '@/lib/api'
+import { celebrateFinalCrew, fireCrewCannon, type ViewportPoint } from '@/lib/celebrations'
+import { memberColor } from '@/lib/member-color'
+import { stopStarfield } from '@/lib/starfield'
 import { missionMonth, missionName } from '@/lib/mission'
 import { CrewList } from './crew-list'
 import { MissionLog } from './mission-log'
@@ -25,6 +28,7 @@ export function MissionControl() {
   const [wheel, setWheel] = useState<WheelState>({ rotation: 0, durationMs: 0 })
   const [launched, setLaunched] = useState<Launched | null>(null)
   const spinTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const crewPanel = useRef<HTMLElement>(null)
 
   useEffect(() => {
     Promise.all([teamMembersApi.list(), roundsApi.list()])
@@ -78,9 +82,11 @@ export function MissionControl() {
 
       if (current.finalCrewNext) {
         // Nothing left to choose: the remaining members form the final crew without a spin.
+        const finalCrew = result.round.pairs.at(-1)?.members ?? result.picked
         replaceRound(result.round)
-        setLaunched({ members: result.round.pairs.at(-1)?.members ?? result.picked, finalCrew: true })
+        setLaunched({ members: finalCrew, finalCrew: true })
         setBusy(false)
+        void celebrateFinalCrew()
         return
       }
 
@@ -95,6 +101,19 @@ export function MissionControl() {
       spinTimer.current = setTimeout(() => {
         replaceRound(result.round)
         setLaunched({ members: [picked], finalCrew: false })
+
+        // A crew is complete when the pick joined someone who was waiting for a buddy. The cannon fires from that
+        // crew's row in the crew assignments, after React has rendered the new buddy into it.
+        const crew = result.round.pairs.find((pair) => pair.members.some((m) => m.id === picked.id))
+        if (crew && crew.members.length > 1) {
+          requestAnimationFrame(() => {
+            const row = crewPanel.current?.querySelector(`[data-crew="${crew.number}"]`)
+            void fireCrewCannon(
+              crew.members.map((m) => memberColor(m.id)),
+              centreOf(row),
+            )
+          })
+        }
         setWheel({ rotation: 0, durationMs: 0 })
         setBusy(false)
       }, durationMs + 300)
@@ -109,6 +128,7 @@ export function MissionControl() {
     return run(async () => {
       replaceRound(await roundsApi.undoLastSpin(latest.id))
       setLaunched(null)
+      stopStarfield()
     }, 'Could not undo the last launch.')
   }
 
@@ -119,6 +139,7 @@ export function MissionControl() {
       await roundsApi.undo(round.id)
       setRounds((all) => all.filter((r) => r.id !== round.id))
       setLaunched(null)
+      stopStarfield()
     }, 'Could not scrub the mission.')
   }
 
@@ -197,7 +218,7 @@ export function MissionControl() {
           )}
         </section>
 
-        <section className="panel flex flex-col gap-4" aria-labelledby="crew-heading">
+        <section ref={crewPanel} className="panel flex flex-col gap-4" aria-labelledby="crew-heading">
           <h2 id="crew-heading" className="panel-heading">
             Crew assignments
           </h2>
@@ -226,4 +247,18 @@ export function MissionControl() {
       </div>
     </div>
   )
+}
+
+/**
+ * Centre of an element as fractions of the viewport, kept on screen so a burst stays visible when the element is
+ * scrolled out of view. The middle of the screen when the element is not rendered.
+ */
+function centreOf(element: Element | null | undefined): ViewportPoint {
+  if (!element) return { x: 0.5, y: 0.5 }
+  const rect = element.getBoundingClientRect()
+  const clamp = (value: number) => Math.min(0.95, Math.max(0.05, value))
+  return {
+    x: clamp((rect.left + rect.width / 2) / window.innerWidth),
+    y: clamp((rect.top + rect.height / 2) / window.innerHeight),
+  }
 }

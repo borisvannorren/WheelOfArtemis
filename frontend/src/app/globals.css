@@ -42,6 +42,15 @@ body {
     370px 370px,
     370px 370px,
     370px 370px;
+  /* The star layers are moved by the ascent after the final crew launches (lib/starfield.ts). */
+  background-position:
+    0 0,
+    0 var(--stars-near, 0px),
+    0 var(--stars-near, 0px),
+    0 var(--stars-near, 0px),
+    0 var(--stars-far, 0px),
+    0 var(--stars-far, 0px),
+    0 var(--stars-far, 0px);
   background-attachment: fixed;
 }
 

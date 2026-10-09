@@ -17,6 +17,7 @@ export function CrewList({ pairs, highlightIds = [] }: CrewListProps) {
       {pairs.map((pair) => (
         <li
           key={pair.number}
+          data-crew={pair.number}
           className="flex items-baseline gap-4 rounded-lg border border-white/10 bg-space-800/60 px-4 py-3"
         >
           <span className="w-16 shrink-0 font-mono text-xs tracking-widest text-lunar-400 uppercase">
