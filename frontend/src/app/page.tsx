@@ -14,8 +14,23 @@ export default function Home() {
 
       <MissionControl />
 
-      <footer className="border-t border-white/10 pt-6 text-xs text-lunar-500">
-        Inspired by NASA&apos;s Artemis program. Not affiliated with or endorsed by NASA.
+      <footer className="flex flex-col gap-1 border-t border-white/10 pt-6 text-xs text-lunar-500">
+        <p>
+          Team Artemis is part of{' '}
+          <a
+            href="https://dev.hoppinger.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-lunar-300 underline underline-offset-2 hover:text-signal-400"
+          >
+            Hoppinger Development
+          </a>
+          .
+        </p>
+        <p>
+          This frontend is largely vibe coded: it was generated with AI and has had limited review. Expect rough edges.
+        </p>
+        <p>Inspired by NASA&apos;s Artemis program. Not affiliated with or endorsed by NASA.</p>
       </footer>
     </main>
   )
