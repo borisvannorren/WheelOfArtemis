@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -137.5 40 40">
+  <!-- The lander that points at the wheel (see components/wheel.tsx), on a dark tile for contrast in light tabs. -->
+  <rect x="-20" y="-137.5" width="40" height="40" rx="9" fill="#0a1022"/>
+  <path d="M -11 -134 L 11 -134 L 6 -116 L -6 -116 Z" fill="#dddbd3"/>
+  <path d="M -6 -116 L 6 -116 L 0 -101 Z" fill="#e4572e"/>
+  <circle cy="-127" r="3" fill="#121a33"/>
+</svg>
