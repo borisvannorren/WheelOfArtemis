@@ -1,0 +1,69 @@
+name: wheel-of-artemis
+
+x-connection-string: &connection-string Host=postgres;Database=${POSTGRES_DB:-wheel_of_artemis};Username=${POSTGRES_USER:-artemis};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)};GSS Encryption Mode=Disable
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wheel_of_artemis}
+      POSTGRES_USER: ${POSTGRES_USER:-artemis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    ports:
+      - 127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432
+    volumes:
+      # From Postgres 18 the image keeps its data in a versioned subdirectory of /var/lib/postgresql.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Next.js dev server. Not published to the host: the backend proxies page requests to it.
+  frontend:
+    build:
+      context: .
+      target: frontend-dev
+    user: ${USER_ID:-1000}:${GROUP_ID:-1000}
+    volumes:
+      - ./frontend:/app/frontend
+
+  # The leading application. Serves /api and forwards everything else to the frontend container.
+  backend:
+    build:
+      context: .
+      target: backend-dev
+    user: ${USER_ID:-1000}:${GROUP_ID:-1000}
+    ports:
+      - 127.0.0.1:${APP_PORT:-5000}:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: *connection-string
+      Frontend__DevServerUrl: http://frontend:3000
+    volumes:
+      - ./backend:/app/backend
+      - nuget:/home/dev/.nuget/packages
+    depends_on:
+      postgres:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+  # Production image (static frontend export served by .NET). Start with `just prod-up`.
+  app:
+    profiles: [prod]
+    build:
+      context: .
+      target: runtime
+    ports:
+      - 127.0.0.1:${PROD_APP_PORT:-5001}:8080
+    environment:
+      ConnectionStrings__Default: *connection-string
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  nuget:

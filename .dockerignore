@@ -1,0 +1,10 @@
+.git
+.claude
+.env
+**/node_modules
+**/.next
+**/out
+**/bin
+**/obj
+**/artifacts
+**/*.user
