@@ -2,11 +2,11 @@ import type { Pair, TeamMember } from '@/lib/api'
 
 type CrewListProps = {
   pairs: Pair[]
-  highlightId?: number
+  highlightIds?: number[]
 }
 
 /** The buddy pairs of a round, shown as crews. A pair with one member is still waiting for a buddy. */
-export function CrewList({ pairs, highlightId }: CrewListProps) {
+export function CrewList({ pairs, highlightIds = [] }: CrewListProps) {
   if (pairs.length === 0) {
     return <p className="text-lunar-400">No crews assigned yet. Launch the wheel to pick the first crew member.</p>
   }
@@ -23,7 +23,12 @@ export function CrewList({ pairs, highlightId }: CrewListProps) {
           </span>
           <span className="flex flex-wrap items-baseline gap-x-2">
             {pair.members.map((member, index) => (
-              <CrewMember key={member.id} member={member} highlight={member.id === highlightId} first={index === 0} />
+              <CrewMember
+                key={member.id}
+                member={member}
+                highlight={highlightIds.includes(member.id)}
+                first={index === 0}
+              />
             ))}
             {pair.members.length === 1 && <span className="text-lunar-400 italic">awaiting buddy…</span>}
           </span>

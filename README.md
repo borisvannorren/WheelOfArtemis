@@ -16,12 +16,12 @@ The app is themed after NASA's Artemis program, so a round is a **mission**, the
 2. **Start a mission.** This needs at least two team members. Missions are numbered like the real ones (Mission I, II, III…) and labelled with the month they started.
 3. **Launch.** The wheel, drawn as the Moon, spins and the lander points at one name. That person leaves the wheel.
 4. **Pair up.** Every two names form a crew of feedback buddies. Buddies are mutual: both give feedback and ask for it.
-5. **Odd team size.** When one person is left after the last pair, they join that pair, which becomes a trio.
+5. **Final crew.** Once only two or three people are left, there is nothing left to choose. The button changes to *Launch final crew* and assigns them together as the last crew without spinning: a pair, or a trio when the team size is odd.
 6. **Mission complete.** When everyone has a buddy, the mission moves to the mission log.
 
 **Every spin is saved immediately.** Closing the page in the middle of a mission is fine; it continues where it stopped.
 
-**Undo.** *Undo last spin* takes back the most recent pick of the latest mission, including the final pick of a completed mission, which reopens it. *Scrub* removes a whole mission, for example when the result is unwanted. A scrubbed mission no longer counts for repeat avoidance.
+**Undo.** *Undo last launch* takes back the most recent launch of the latest mission: one pick, or the whole final crew. Undoing the final crew of a completed mission reopens it. *Scrub* removes a whole mission, for example when the result is unwanted. A scrubbed mission no longer counts for repeat avoidance.
 
 ### How repeats are avoided
 
@@ -93,7 +93,7 @@ Run `just` to see all recipes. The ones you will use most:
 | `just fe-add <pkg>` | Add an npm package (`just fe-add -D <pkg>` for dev dependencies) |
 | `just fe-lint` / `just fe-format` / `just fe-typecheck` | ESLint / Prettier / TypeScript for the frontend |
 | `just be-build` / `just be-test` | Build / test the backend |
-| `just migration-add <Name>` | Create an EF Core migration after changing the data model (`just migration-remove` undoes an unapplied one) |
+| `just migration-add <Name>` | Create an EF Core migration after changing the data model, and restart the backend so it is applied (`just migration-remove` undoes an unapplied one) |
 | `just psql` | Open a psql shell on the database |
 | `just db-reset` | Delete all data and start with an empty, migrated database |
 | `just prod-up` / `just prod-down` | Build and run the production image on port 5001 |

@@ -18,10 +18,13 @@ export type Round = {
   pairs: Pair[]
   /** Members still on the wheel. Empty once the round is complete. */
   remaining: TeamMember[]
+  /** The next launch assigns everyone left as the final crew, without spinning. */
+  finalCrewNext: boolean
 }
 
 export type SpinResult = {
-  picked: TeamMember
+  /** The member the wheel picked, or everyone assigned to the final crew. */
+  picked: TeamMember[]
   round: Round
 }
 

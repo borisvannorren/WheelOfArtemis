@@ -30,8 +30,14 @@ public sealed class RoundPick
     public int TeamMemberId { get; set; }
     public TeamMember TeamMember { get; set; } = null!;
 
-    /// <summary>Order of the spin within the round, starting at 1.</summary>
+    /// <summary>Order of the pick within the round, starting at 1.</summary>
     public int Sequence { get; set; }
+
+    /// <summary>
+    /// The launch that made this pick, starting at 1. The final crew is assigned in one launch, so its picks
+    /// share a number and are undone together.
+    /// </summary>
+    public int Launch { get; set; }
 
     public int PairNumber { get; set; }
 }

@@ -8,7 +8,8 @@ public sealed record PlannedPick(int MemberId, int PairNumber);
 /// <item>The first person of a pair is picked at random.</item>
 /// <item>Their buddy is picked at random from the candidates they paired with least recently, while
 /// keeping the best possible outcome for everyone still on the wheel.</item>
-/// <item>When one person is left after the last pair, they join that pair as a trio.</item>
+/// <item>Once at most three people are without a complete crew, the rest of the round is fixed:
+/// they form the final crew (a pair, or a trio when the team size is odd) in a single launch.</item>
 /// </list>
 /// </summary>
 public sealed class SpinPlanner(Random random)
@@ -18,10 +19,13 @@ public sealed class SpinPlanner(Random random)
 
     private const long Unreachable = long.MaxValue / 4;
 
+    /// <summary>
+    /// The picks of the next launch: one person, or everyone left when the final crew is next.
+    /// </summary>
     /// <param name="picks">Picks of the current round, in spin order.</param>
     /// <param name="remaining">Members still on the wheel. Must not be empty.</param>
     /// <param name="history">Earlier rounds, newest first, each as its groups of member ids.</param>
-    public PlannedPick NextPick(
+    public IReadOnlyList<PlannedPick> NextPicks(
         IReadOnlyList<PlannedPick> picks,
         IReadOnlyList<int> remaining,
         IReadOnlyList<IReadOnlyList<IReadOnlyList<int>>> history)
@@ -32,21 +36,41 @@ public sealed class SpinPlanner(Random random)
         }
 
         var lastPairNumber = picks.Count == 0 ? 0 : picks[^1].PairNumber;
-        var lastPairSize = picks.Count(p => p.PairNumber == lastPairNumber);
+        var waitingForBuddy = IsWaitingForBuddy(picks);
 
-        if (lastPairSize == 1)
+        if (IsFinalCrewNext(picks, remaining.Count))
+        {
+            var pairNumber = waitingForBuddy ? lastPairNumber : lastPairNumber + 1;
+            return remaining.Select(member => new PlannedPick(member, pairNumber)).ToList();
+        }
+
+        if (waitingForBuddy)
         {
             var costs = PairingCosts.FromHistory(history);
-            return new PlannedPick(PickBuddy(picks[^1].MemberId, remaining, costs), lastPairNumber);
+            return [new PlannedPick(PickBuddy(picks[^1].MemberId, remaining, costs), lastPairNumber)];
         }
 
         if (remaining.Count == 1 && picks.Count > 0)
         {
-            return new PlannedPick(remaining[0], lastPairNumber);
+            // Only reachable for rounds spun before final crews were assigned automatically.
+            return [new PlannedPick(remaining[0], lastPairNumber)];
         }
 
-        return new PlannedPick(remaining[random.Next(remaining.Count)], lastPairNumber + 1);
+        return [new PlannedPick(remaining[random.Next(remaining.Count)], lastPairNumber + 1)];
     }
+
+    /// <summary>
+    /// True when the next launch assigns the final crew: two or three people are left without a complete crew,
+    /// so there is nothing left to choose.
+    /// </summary>
+    public static bool IsFinalCrewNext(IReadOnlyList<PlannedPick> picks, int remainingCount)
+    {
+        var withoutCrew = remainingCount + (IsWaitingForBuddy(picks) ? 1 : 0);
+        return remainingCount > 0 && withoutCrew is >= 2 and <= 3;
+    }
+
+    private static bool IsWaitingForBuddy(IReadOnlyList<PlannedPick> picks) =>
+        picks.Count > 0 && picks.Count(p => p.PairNumber == picks[^1].PairNumber) == 1;
 
     private int PickBuddy(int member, IReadOnlyList<int> remaining, PairingCosts costs)
     {

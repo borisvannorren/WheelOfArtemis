@@ -8,14 +8,17 @@ namespace WheelOfArtemis.Api.Features.Rounds;
 
 public sealed record PairResponse(int Number, IReadOnlyList<TeamMemberResponse> Members);
 
+/// <param name="FinalCrewNext">True when the next launch assigns everyone left as the final crew, without spinning.</param>
 public sealed record RoundResponse(
     int Id,
     DateTimeOffset StartedAt,
     DateTimeOffset? CompletedAt,
     IReadOnlyList<PairResponse> Pairs,
-    IReadOnlyList<TeamMemberResponse> Remaining);
+    IReadOnlyList<TeamMemberResponse> Remaining,
+    bool FinalCrewNext);
 
-public sealed record SpinResponse(TeamMemberResponse Picked, RoundResponse Round);
+/// <param name="Picked">The member picked by the wheel, or all members of the final crew assigned in this launch.</param>
+public sealed record SpinResponse(IReadOnlyList<TeamMemberResponse> Picked, RoundResponse Round);
 
 public static class RoundEndpoints
 {
@@ -85,18 +88,22 @@ public static class RoundEndpoints
         var remaining = Remaining(round, active);
         var history = await History(db, round.Id, ct);
 
-        var picks = round.Picks.Select(p => new PlannedPick(p.TeamMemberId, p.PairNumber)).ToList();
-        var next = planner.NextPick(picks, remaining.Select(m => m.Id).ToList(), history);
-        var picked = remaining.Single(m => m.Id == next.MemberId);
+        var next = planner.NextPicks(PlannedPicks(round), remaining.Select(m => m.Id).ToList(), history);
+        var launch = round.Picks.Count == 0 ? 1 : round.Picks.Max(p => p.Launch) + 1;
+        var picked = next.Select(pick => remaining.Single(m => m.Id == pick.MemberId)).ToList();
 
-        round.Picks.Add(new RoundPick
+        foreach (var (pick, member) in next.Zip(picked))
         {
-            TeamMember = picked,
-            Sequence = round.Picks.Count + 1,
-            PairNumber = next.PairNumber,
-        });
+            round.Picks.Add(new RoundPick
+            {
+                TeamMember = member,
+                Sequence = round.Picks.Count + 1,
+                Launch = launch,
+                PairNumber = pick.PairNumber,
+            });
+        }
 
-        if (remaining.Count == 1)
+        if (picked.Count == remaining.Count)
         {
             round.CompletedAt = DateTimeOffset.UtcNow;
         }
@@ -107,18 +114,18 @@ public static class RoundEndpoints
         }
         catch (DbUpdateException)
         {
-            // Another tab spun this round at the same moment; its pick won.
+            // Another tab launched in this round at the same moment; its picks won.
             return Conflict("Round changed", "This round was changed elsewhere. Reload to see the latest state.");
         }
 
         return TypedResults.Ok(new SpinResponse(
-            new TeamMemberResponse(picked.Id, picked.Name),
+            picked.Select(m => new TeamMemberResponse(m.Id, m.Name)).ToList(),
             ToResponse(round, active)));
     }
 
     /// <summary>
-    /// Takes back the most recent spin of the latest round. Undoing the final spin of a completed round
-    /// puts it back in progress.
+    /// Takes back the most recent launch of the latest round: one pick, or the whole final crew.
+    /// Undoing the last launch of a completed round puts it back in progress.
     /// </summary>
     private static async Task<Results<Ok<RoundResponse>, NotFound, Conflict<ProblemDetails>>> UndoLastSpin(
         int id, AppDbContext db, CancellationToken ct)
@@ -131,15 +138,16 @@ public static class RoundEndpoints
 
         if (await db.Rounds.AnyAsync(r => r.StartedAt > round.StartedAt, ct))
         {
-            return Conflict("Not the latest round", "Spins can only be undone in the latest round.");
+            return Conflict("Not the latest round", "Launches can only be undone in the latest round.");
         }
 
         if (round.Picks.Count == 0)
         {
-            return Conflict("Nothing to undo", "This round has no spins yet.");
+            return Conflict("Nothing to undo", "This round has no launches yet.");
         }
 
-        round.Picks.Remove(round.Picks.MaxBy(p => p.Sequence)!);
+        var lastLaunch = round.Picks.Max(p => p.Launch);
+        round.Picks.RemoveAll(p => p.Launch == lastLaunch);
         round.CompletedAt = null;
         await db.SaveChangesAsync(ct);
 
@@ -174,20 +182,27 @@ public static class RoundEndpoints
             .ToList();
     }
 
-    private static RoundResponse ToResponse(Round round, List<TeamMember> active) => new(
-        round.Id,
-        round.StartedAt,
-        round.CompletedAt,
-        round.Picks
-            .OrderBy(p => p.Sequence)
-            .GroupBy(p => p.PairNumber)
-            .Select(g => new PairResponse(
-                g.Key,
-                g.Select(p => new TeamMemberResponse(p.TeamMember.Id, p.TeamMember.Name)).ToList()))
-            .ToList(),
-        round.CompletedAt is null
-            ? Remaining(round, active).Select(m => new TeamMemberResponse(m.Id, m.Name)).ToList()
-            : []);
+    private static List<PlannedPick> PlannedPicks(Round round) =>
+        round.Picks.OrderBy(p => p.Sequence).Select(p => new PlannedPick(p.TeamMemberId, p.PairNumber)).ToList();
+
+    private static RoundResponse ToResponse(Round round, List<TeamMember> active)
+    {
+        var remaining = round.CompletedAt is null ? Remaining(round, active) : [];
+
+        return new RoundResponse(
+            round.Id,
+            round.StartedAt,
+            round.CompletedAt,
+            round.Picks
+                .OrderBy(p => p.Sequence)
+                .GroupBy(p => p.PairNumber)
+                .Select(g => new PairResponse(
+                    g.Key,
+                    g.Select(p => new TeamMemberResponse(p.TeamMember.Id, p.TeamMember.Name)).ToList()))
+                .ToList(),
+            remaining.Select(m => new TeamMemberResponse(m.Id, m.Name)).ToList(),
+            round.CompletedAt is null && SpinPlanner.IsFinalCrewNext(PlannedPicks(round), remaining.Count));
+    }
 
     private static Conflict<ProblemDetails> Conflict(string title, string detail) =>
         TypedResults.Conflict(new ProblemDetails { Title = title, Detail = detail });

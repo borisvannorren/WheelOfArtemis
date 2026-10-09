@@ -11,7 +11,7 @@ public sealed class SpinPlannerTests
     {
         var planner = new SpinPlanner(new Random(1));
 
-        var pick = planner.NextPick([], [1, 2, 3, 4], NoHistory);
+        var pick = Assert.Single(planner.NextPicks([], [1, 2, 3, 4], NoHistory));
 
         Assert.InRange(pick.MemberId, 1, 4);
         Assert.Equal(1, pick.PairNumber);
@@ -22,19 +22,79 @@ public sealed class SpinPlannerTests
     {
         var planner = new SpinPlanner(new Random(1));
 
-        var pick = planner.NextPick([new(1, 1), new(2, 1)], [3, 4], NoHistory);
+        var pick = Assert.Single(planner.NextPicks([new(1, 1), new(2, 1)], [3, 4, 5, 6], NoHistory));
 
         Assert.Equal(2, pick.PairNumber);
     }
 
     [Fact]
-    public void Last_person_left_joins_the_last_pair_as_a_trio()
+    public void Last_two_people_are_assigned_together_as_the_final_crew()
     {
         var planner = new SpinPlanner(new Random(1));
 
-        var pick = planner.NextPick([new(1, 1), new(2, 1), new(3, 2), new(4, 2)], [5], NoHistory);
+        var picks = planner.NextPicks([new(1, 1), new(2, 1)], [3, 4], NoHistory);
 
-        Assert.Equal(new PlannedPick(5, 2), pick);
+        Assert.Equal([new PlannedPick(3, 2), new PlannedPick(4, 2)], picks);
+    }
+
+    [Fact]
+    public void Last_three_people_are_assigned_together_as_a_trio()
+    {
+        var planner = new SpinPlanner(new Random(1));
+
+        var picks = planner.NextPicks([new(1, 1), new(2, 1)], [3, 4, 5], NoHistory);
+
+        Assert.Equal([new PlannedPick(3, 2), new PlannedPick(4, 2), new PlannedPick(5, 2)], picks);
+    }
+
+    [Fact]
+    public void Team_of_two_or_three_is_one_crew_straight_away()
+    {
+        var planner = new SpinPlanner(new Random(1));
+
+        Assert.Equal(2, planner.NextPicks([], [1, 2], NoHistory).Count);
+        Assert.Equal(3, planner.NextPicks([], [1, 2, 3], NoHistory).Count);
+    }
+
+    [Fact]
+    public void Person_waiting_for_a_buddy_gets_the_rest_as_final_crew()
+    {
+        // Rounds spun before final crews were automatic can have someone waiting with two people left.
+        var planner = new SpinPlanner(new Random(1));
+
+        var picks = planner.NextPicks([new(1, 1), new(2, 1), new(3, 2)], [4, 5], NoHistory);
+
+        Assert.Equal([new PlannedPick(4, 2), new PlannedPick(5, 2)], picks);
+    }
+
+    [Theory]
+    [InlineData(new int[0], 4, false)]
+    [InlineData(new int[0], 3, true)]
+    [InlineData(new[] { 1, 2 }, 4, false)]
+    [InlineData(new[] { 1, 2 }, 3, true)]
+    [InlineData(new[] { 1, 2 }, 2, true)]
+    [InlineData(new[] { 1, 2 }, 1, false)]
+    [InlineData(new[] { 1, 2, 3 }, 3, false)]
+    [InlineData(new[] { 1, 2, 3 }, 2, true)]
+    [InlineData(new[] { 1, 2, 3 }, 1, true)]
+    [InlineData(new[] { 1, 2, 3, 4 }, 0, false)]
+    public void Final_crew_is_next_when_two_or_three_people_are_without_a_crew(
+        int[] pickedMembers, int remainingCount, bool expected)
+    {
+        // Picked members fill pairs in order: 1 and 2 form pair 1, 3 waits in pair 2.
+        var picks = pickedMembers.Select((member, index) => new PlannedPick(member, index / 2 + 1)).ToList();
+
+        Assert.Equal(expected, SpinPlanner.IsFinalCrewNext(picks, remainingCount));
+    }
+
+    [Fact]
+    public void Last_person_left_joins_the_last_pair_in_rounds_from_before_automatic_final_crews()
+    {
+        var planner = new SpinPlanner(new Random(1));
+
+        var picks = planner.NextPicks([new(1, 1), new(2, 1), new(3, 2), new(4, 2)], [5], NoHistory);
+
+        Assert.Equal([new PlannedPick(5, 2)], picks);
     }
 
     [Theory]
@@ -46,9 +106,9 @@ public sealed class SpinPlannerTests
     public void Buddy_is_never_last_rounds_partner_when_someone_else_is_available(int seed)
     {
         var planner = new SpinPlanner(new Random(seed));
-        IReadOnlyList<IReadOnlyList<IReadOnlyList<int>>> history = [[[1, 2], [3, 4]]];
+        IReadOnlyList<IReadOnlyList<IReadOnlyList<int>>> history = [[[1, 2], [3, 4], [5, 6]]];
 
-        var pick = planner.NextPick([new(1, 1)], [2, 3, 4], history);
+        var pick = Assert.Single(planner.NextPicks([new(1, 1)], [2, 3, 4, 5, 6], history));
 
         Assert.NotEqual(2, pick.MemberId);
     }
@@ -71,7 +131,7 @@ public sealed class SpinPlannerTests
         ];
         var planner = new SpinPlanner(new Random(seed));
 
-        var pick = planner.NextPick([new(1, 1)], [2, 3, 4, 5, 6], history);
+        var pick = Assert.Single(planner.NextPicks([new(1, 1)], [2, 3, 4, 5, 6], history));
 
         Assert.Equal(6, pick.MemberId);
     }
@@ -114,9 +174,11 @@ public sealed class SpinPlannerTests
 
         while (remaining.Count > 0)
         {
-            var pick = planner.NextPick(picks, remaining, history);
-            picks.Add(pick);
-            remaining.Remove(pick.MemberId);
+            foreach (var pick in planner.NextPicks(picks, remaining, history))
+            {
+                picks.Add(pick);
+                remaining.Remove(pick.MemberId);
+            }
         }
 
         return picks

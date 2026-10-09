@@ -102,6 +102,8 @@ be-shell:
 [group('backend')]
 migration-add name:
     docker compose run --rm --no-deps backend sh -c "dotnet tool restore && dotnet restore && dotnet ef migrations add {{ name }} --project src/WheelOfArtemis.Api --output-dir Data/Migrations"
+    @# dotnet watch hot-reloads the new migration without restarting, so the startup migration would not run.
+    -docker compose restart backend
 
 
 # Apply pending migrations without starting the app (the app also applies them on startup)

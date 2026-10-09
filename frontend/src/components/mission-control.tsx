@@ -13,6 +13,9 @@ const REDUCED_MOTION_DURATION_MS = 400
 
 type WheelState = { rotation: number; durationMs: number }
 
+/** What the last launch did: put one member on board, or assign the final crew. */
+type Launched = { members: TeamMember[]; finalCrew: boolean }
+
 export function MissionControl() {
   const [members, setMembers] = useState<TeamMember[]>([])
   const [rounds, setRounds] = useState<Round[]>([])
@@ -20,7 +23,7 @@ export function MissionControl() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [wheel, setWheel] = useState<WheelState>({ rotation: 0, durationMs: 0 })
-  const [lastPicked, setLastPicked] = useState<TeamMember | null>(null)
+  const [launched, setLaunched] = useState<Launched | null>(null)
   const spinTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export function MissionControl() {
     return run(async () => {
       const round = await roundsApi.start()
       setRounds((all) => [round, ...all])
-      setLastPicked(null)
+      setLaunched(null)
     }, 'Could not start the mission.')
   }
 
@@ -67,12 +70,22 @@ export function MissionControl() {
     if (!current) return
     setBusy(true)
     setError(null)
-    setLastPicked(null)
+    setLaunched(null)
 
     try {
       // The backend decides and saves the outcome; the wheel then turns to it.
       const result = await roundsApi.spin(current.id)
-      const index = current.remaining.findIndex((m) => m.id === result.picked.id)
+
+      if (current.finalCrewNext) {
+        // Nothing left to choose: the remaining members form the final crew without a spin.
+        replaceRound(result.round)
+        setLaunched({ members: result.round.pairs.at(-1)?.members ?? result.picked, finalCrew: true })
+        setBusy(false)
+        return
+      }
+
+      const [picked] = result.picked
+      const index = current.remaining.findIndex((m) => m.id === picked.id)
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const durationMs = reducedMotion ? REDUCED_MOTION_DURATION_MS : SPIN_DURATION_MS
       const turns = reducedMotion ? 0 : 5 + Math.floor(Math.random() * 3)
@@ -81,7 +94,7 @@ export function MissionControl() {
 
       spinTimer.current = setTimeout(() => {
         replaceRound(result.round)
-        setLastPicked(result.picked)
+        setLaunched({ members: [picked], finalCrew: false })
         setWheel({ rotation: 0, durationMs: 0 })
         setBusy(false)
       }, durationMs + 300)
@@ -95,8 +108,8 @@ export function MissionControl() {
     if (!latest) return
     return run(async () => {
       replaceRound(await roundsApi.undoLastSpin(latest.id))
-      setLastPicked(null)
-    }, 'Could not undo the last spin.')
+      setLaunched(null)
+    }, 'Could not undo the last launch.')
   }
 
   function handleScrub(round: Round) {
@@ -105,7 +118,7 @@ export function MissionControl() {
     return run(async () => {
       await roundsApi.undo(round.id)
       setRounds((all) => all.filter((r) => r.id !== round.id))
-      setLastPicked(null)
+      setLaunched(null)
     }, 'Could not scrub the mission.')
   }
 
@@ -138,9 +151,15 @@ export function MissionControl() {
           <Wheel members={wheelMembers} rotation={wheel.rotation} durationMs={wheel.durationMs} />
 
           <p aria-live="polite" className="min-h-7 text-center font-mono text-lg tracking-widest uppercase">
-            {lastPicked && (
+            {launched?.finalCrew && (
               <>
-                <span className="text-signal-400">{lastPicked.name}</span>
+                <span className="text-lunar-300">Final crew: </span>
+                <span className="text-signal-400">{launched.members.map((m) => m.name).join(' + ')}</span>
+              </>
+            )}
+            {launched && !launched.finalCrew && (
+              <>
+                <span className="text-signal-400">{launched.members[0].name}</span>
                 <span className="text-lunar-300"> is on board</span>
               </>
             )}
@@ -149,7 +168,7 @@ export function MissionControl() {
           <div className="flex flex-wrap justify-center gap-3">
             {current ? (
               <button type="button" onClick={handleLaunch} disabled={busy} className="button-primary">
-                Launch
+                {current.finalCrewNext ? 'Launch final crew' : 'Launch'}
               </button>
             ) : (
               <button
@@ -163,7 +182,7 @@ export function MissionControl() {
             )}
             {canUndoSpin && (
               <button type="button" onClick={handleUndoLastSpin} disabled={busy} className="button-secondary">
-                Undo last spin
+                Undo last launch
               </button>
             )}
             {current && (
@@ -188,7 +207,7 @@ export function MissionControl() {
                 {missionName(shownRound, rounds)} · {missionMonth(shownRound)} ·{' '}
                 {shownRound.completedAt ? 'mission complete' : 'in progress'}
               </p>
-              <CrewList pairs={shownRound.pairs} highlightId={lastPicked?.id} />
+              <CrewList pairs={shownRound.pairs} highlightIds={launched?.members.map((m) => m.id)} />
               {shownRound.completedAt && (
                 <p className="text-sm text-lunar-300">
                   Every crew member has a buddy. Give each other feedback this month, and ask for it too.
