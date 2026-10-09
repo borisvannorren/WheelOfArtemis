@@ -66,10 +66,11 @@ fe-lint:
 fe-format:
     docker compose run --rm --no-deps frontend npm run format
 
-# Build the static export (output in frontend/out)
+# Type-check the frontend. (A full `next build` would share .next with the running dev server and
+# break its CSS updates; the production image builds the frontend in isolation, see `just prod-up`.)
 [group('frontend')]
-fe-build:
-    docker compose run --rm --no-deps frontend npm run build
+fe-typecheck:
+    docker compose run --rm --no-deps frontend npm run typecheck
 
 # Open a shell in the frontend container
 [group('frontend')]
@@ -81,6 +82,16 @@ fe-shell:
 [group('backend')]
 be-build:
     docker compose run --rm --no-deps backend dotnet build
+
+# Remove the most recent EF Core migration (only when it has not been applied)
+[group('backend')]
+migration-remove:
+    docker compose run --rm backend sh -c "dotnet tool restore && dotnet restore && dotnet ef migrations remove --project src/WheelOfArtemis.Api"
+
+# Run the backend tests
+[group('backend')]
+be-test:
+    docker compose run --rm --no-deps backend dotnet test
 
 # Open a shell in the backend container
 [group('backend')]

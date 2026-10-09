@@ -1,26 +1,64 @@
 @import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-space-950: #05070f;
+  --color-space-900: #0a1022;
+  --color-space-800: #121a33;
+  --color-space-700: #1c2746;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-lunar-100: #f1f0eb;
+  --color-lunar-200: #dddbd3;
+  --color-lunar-300: #c3c0b6;
+  --color-lunar-400: #9c998f;
+  --color-lunar-500: #75736b;
+
+  --color-signal-400: #f2845f;
+  --color-signal-500: #e4572e;
+
+  --color-earth-400: #5b9bd5;
+  --color-earth-500: #2f6fb0;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  color: var(--color-lunar-100);
+  background-color: var(--color-space-950);
+  /* Earth glow on the horizon and two layers of stars. */
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% 115%, rgb(47 111 176 / 0.35), transparent 70%),
+    radial-gradient(1px 1px at 25px 35px, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1px 1px at 140px 90px, rgb(255 255 255 / 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 90px 160px, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1px 1px at 210px 20px, rgb(255 255 255 / 0.4), transparent),
+    radial-gradient(1px 1px at 60px 260px, rgb(255 255 255 / 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 330px 210px, rgb(255 255 255 / 0.45), transparent);
+  background-size:
+    100% 100%,
+    240px 240px,
+    240px 240px,
+    240px 240px,
+    370px 370px,
+    370px 370px,
+    370px 370px;
+  background-attachment: fixed;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/10 bg-space-900/75 p-6 shadow-xl shadow-black/30 backdrop-blur-sm;
+  }
+
+  .panel-heading {
+    @apply font-mono text-sm tracking-[0.2em] text-lunar-200 uppercase;
+  }
+
+  .button-primary {
+    @apply rounded-md bg-signal-500 px-6 py-3 font-mono text-sm font-semibold tracking-[0.2em] text-white uppercase transition-colors hover:bg-signal-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal-400 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .button-secondary {
+    @apply rounded-md border border-lunar-400/40 px-4 py-2 font-mono text-xs tracking-[0.15em] text-lunar-200 uppercase transition-colors hover:border-lunar-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunar-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
 }

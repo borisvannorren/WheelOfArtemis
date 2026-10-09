@@ -38,6 +38,11 @@ public static class TeamMemberEndpoints
     private static async Task<Results<Created<TeamMemberResponse>, Conflict<ProblemDetails>>> Create(
         CreateTeamMemberRequest request, AppDbContext db, CancellationToken ct)
     {
+        if (await IsRoundInProgress(db, ct))
+        {
+            return RoundInProgressConflict();
+        }
+
         var name = request.Name.Trim();
         var existing = await db.TeamMembers
             .SingleOrDefaultAsync(m => m.Name == name, ct);
@@ -59,12 +64,28 @@ public static class TeamMemberEndpoints
         return TypedResults.Created($"/api/team-members/{member.Id}", new TeamMemberResponse(member.Id, member.Name));
     }
 
-    private static async Task<Results<NoContent, NotFound>> Remove(int id, AppDbContext db, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound, Conflict<ProblemDetails>>> Remove(
+        int id, AppDbContext db, CancellationToken ct)
     {
+        if (await IsRoundInProgress(db, ct))
+        {
+            return RoundInProgressConflict();
+        }
+
         var updated = await db.TeamMembers
             .Where(m => m.Id == id && m.IsActive)
             .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsActive, false), ct);
 
         return updated == 0 ? TypedResults.NotFound() : TypedResults.NoContent();
     }
+
+    // The team is locked during a round, so the wheel and the pairs stay consistent.
+    private static Task<bool> IsRoundInProgress(AppDbContext db, CancellationToken ct) =>
+        db.Rounds.AnyAsync(r => r.CompletedAt == null, ct);
+
+    private static Conflict<ProblemDetails> RoundInProgressConflict() => TypedResults.Conflict(new ProblemDetails
+    {
+        Title = "Round in progress",
+        Detail = "The team can't change during a round. Finish or undo the current round first.",
+    });
 }

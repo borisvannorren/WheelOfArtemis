@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using WheelOfArtemis.Api.Data;
+using WheelOfArtemis.Api.Features.Rounds;
 using WheelOfArtemis.Api.Features.TeamMembers;
 using WheelOfArtemis.Api.Hosting;
 
@@ -11,6 +12,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddSingleton(new SpinPlanner(Random.Shared));
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 builder.Services.AddFrontend(builder.Environment, builder.Configuration);
 
@@ -34,6 +36,7 @@ app.MapHealthChecks("/health");
 
 var api = app.MapGroup("/api");
 api.MapTeamMemberEndpoints();
+api.MapRoundEndpoints();
 // Unknown API routes return a 404 instead of falling through to the frontend.
 api.MapFallback(() => TypedResults.NotFound());
 

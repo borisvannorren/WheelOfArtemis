@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WheelOfArtemis.Api.Features.Rounds;
 using WheelOfArtemis.Api.Features.TeamMembers;
 
 namespace WheelOfArtemis.Api.Data;
@@ -6,6 +7,7 @@ namespace WheelOfArtemis.Api.Data;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<Round> Rounds => Set<Round>();
 
     public const string CaseInsensitiveCollation = "case_insensitive";
 

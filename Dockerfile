@@ -47,6 +47,7 @@ WORKDIR /src/backend
 COPY backend/global.json backend/Directory.Build.props backend/Directory.Packages.props backend/WheelOfArtemis.slnx ./
 COPY backend/src/WheelOfArtemis.Api/WheelOfArtemis.Api.csproj src/WheelOfArtemis.Api/
 RUN dotnet restore src/WheelOfArtemis.Api/WheelOfArtemis.Api.csproj
+COPY .editorconfig /src/
 COPY backend/ ./
 RUN dotnet publish src/WheelOfArtemis.Api/WheelOfArtemis.Api.csproj -c Release -o /out --no-restore
 

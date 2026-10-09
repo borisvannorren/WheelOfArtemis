@@ -43,6 +43,8 @@ services:
       Frontend__DevServerUrl: http://frontend:3000
     volumes:
       - ./backend:/app/backend
+      # Code style rules live in the repository root, outside the backend folder.
+      - ./.editorconfig:/app/.editorconfig:ro
       - nuget:/home/dev/.nuget/packages
     depends_on:
       postgres:
