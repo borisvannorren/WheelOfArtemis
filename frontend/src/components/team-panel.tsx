@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from 'react'
 import { errorMessage, type TeamMember, teamMembersApi } from '@/lib/api'
+import { MemberName } from './member-name'
 
 type TeamPanelProps = {
   members: TeamMember[]
@@ -82,7 +83,7 @@ export function TeamPanel({ members, locked, onChange }: TeamPanelProps) {
         <ul className="divide-y divide-white/10 rounded-md border border-white/10">
           {members.map((member) => (
             <li key={member.id} className="flex items-center justify-between px-3 py-2">
-              <span className="text-lunar-100">{member.name}</span>
+              <MemberName member={member} className="text-lunar-100" />
               {!locked && (
                 <button
                   type="button"

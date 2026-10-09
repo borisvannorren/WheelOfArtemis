@@ -1,8 +1,9 @@
 import type { TeamMember } from '@/lib/api'
+import { memberColor } from '@/lib/member-color'
 
 const RADIUS = 100
 const LABEL_RADIUS = 60
-const SEGMENT_FILLS = ['#dddbd3', '#c6c3b9', '#d2d0c7', '#b9b6ac']
+const EMPTY_FILL = '#c6c3b9'
 
 // Decorative craters, fixed to the wheel so they turn with it.
 const CRATERS = [
@@ -22,7 +23,7 @@ type WheelProps = {
   durationMs: number
 }
 
-/** The Moon as a wheel of fortune, with one segment per member and the lander as pointer. */
+/** The Moon as a wheel of fortune, with one segment per member in their own colour and the lander as pointer. */
 export function Wheel({ members, rotation, durationMs }: WheelProps) {
   const segmentAngle = members.length > 0 ? 360 / members.length : 360
 
@@ -44,16 +45,17 @@ export function Wheel({ members, rotation, durationMs }: WheelProps) {
         }}
       >
         {members.length === 0 ? (
-          <circle r={RADIUS} fill={SEGMENT_FILLS[1]} />
+          <circle r={RADIUS} fill={EMPTY_FILL} />
         ) : members.length === 1 ? (
-          <circle r={RADIUS} fill={SEGMENT_FILLS[0]} />
+          <circle r={RADIUS} fill={memberColor(members[0].id)} />
         ) : (
           members.map((member, index) => (
             <path
               key={member.id}
               d={segmentPath(index * segmentAngle, (index + 1) * segmentAngle)}
-              fill={SEGMENT_FILLS[index % SEGMENT_FILLS.length]}
-              stroke="#8f8c83"
+              fill={memberColor(member.id)}
+              stroke="#05070f"
+              strokeOpacity="0.35"
               strokeWidth="0.6"
             />
           ))

@@ -1,4 +1,5 @@
 import type { Pair, TeamMember } from '@/lib/api'
+import { MemberName } from './member-name'
 
 type CrewListProps = {
   pairs: Pair[]
@@ -42,7 +43,7 @@ function CrewMember({ member, highlight, first }: { member: TeamMember; highligh
   return (
     <>
       {!first && <span className="text-lunar-500">+</span>}
-      <span className={highlight ? 'font-semibold text-signal-400' : 'text-lunar-100'}>{member.name}</span>
+      <MemberName member={member} className={highlight ? 'font-semibold text-signal-400' : 'text-lunar-100'} />
     </>
   )
 }
