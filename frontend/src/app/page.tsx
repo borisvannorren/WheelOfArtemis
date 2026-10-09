@@ -28,7 +28,8 @@ export default function Home() {
           .
         </p>
         <p>
-          This frontend is largely vibe coded: it was generated with AI and has had limited review. Expect rough edges.
+          This application is 100% vibe coded: the whole app, frontend and backend, was generated with AI. Expect rough
+          edges.
         </p>
         <p>Inspired by NASA&apos;s Artemis program. Not affiliated with or endorsed by NASA.</p>
       </footer>

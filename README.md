@@ -6,7 +6,7 @@ Wheel of Artemis makes choosing those pairs a small team moment instead of a spr
 
 The app runs locally. It is not deployed anywhere.
 
-> **Note:** the frontend is largely vibe coded: it was generated with AI and has had limited review, and it has no automated tests yet. The backend pairing logic is covered by unit tests. The page shows the same notice in its footer.
+> **Note:** this application is 100% vibe coded: the whole codebase, frontend and backend, was generated with AI. The backend pairing logic is covered by unit tests; the frontend has no automated tests yet. The page shows the same notice in its footer.
 
 ## How a round works
 
