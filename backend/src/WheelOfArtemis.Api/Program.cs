@@ -22,6 +22,7 @@ await app.MigrateDatabaseAsync();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseSharedPassword();
 app.UseFrontendStaticFiles();
 // Route after the static files middleware, so "/" is served as index.html instead of matching the frontend fallback.
 app.UseRouting();

@@ -34,16 +34,26 @@ ps:
 restart service:
     docker compose restart {{ service }}
 
-# Build and start the production image (port 5001 by default)
-[group('app')]
+# Build and start the hosted production app (address and port from PROD_BIND_ADDRESS and PROD_PORT in .env)
+[group('production')]
 prod-up:
-    docker compose --profile prod up -d --build app
-    @echo "Production build: http://localhost:${PROD_APP_PORT:-5001}"
+    docker compose -f docker-compose.prod.yaml up -d --build
+    @echo "Wheel of Artemis (production): http://${PROD_BIND_ADDRESS:-127.0.0.1}:${PROD_PORT:-5001}"
 
-# Stop the production image
-[group('app')]
+# Stop the hosted production app (data is kept)
+[group('production')]
 prod-down:
-    docker compose --profile prod stop app
+    docker compose -f docker-compose.prod.yaml down
+
+# Follow the production app's logs
+[group('production')]
+prod-logs:
+    docker compose -f docker-compose.prod.yaml logs -f app
+
+# Open psql on the production database
+[group('production')]
+prod-psql:
+    docker compose -f docker-compose.prod.yaml exec postgres psql -U artemis -d wheel_of_artemis
 
 
 # Install frontend dependencies from package-lock.json
@@ -66,8 +76,10 @@ fe-lint:
 fe-format:
     docker compose run --rm --no-deps frontend npm run format
 
-# Type-check the frontend. (A full `next build` would share .next with the running dev server and
-# break its CSS updates; the production image builds the frontend in isolation, see `just prod-up`.)
+# A full `next build` would share .next with the running dev server and break its CSS updates;
+# the production image builds the frontend in isolation (see `just prod-up`).
+
+# Type-check the frontend
 [group('frontend')]
 fe-typecheck:
     docker compose run --rm --no-deps frontend npm run typecheck

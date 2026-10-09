@@ -1,0 +1,40 @@
+# Production hosting on this machine: the combined image (.NET serving the static Next.js export) and its own
+# database. A separate Compose project, so development commands (`just down`, `just db-reset`) never touch it.
+# Start with `just prod-up`; settings come from the PROD_* variables in .env.
+name: wheel-of-artemis-prod
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wheel_of_artemis
+      POSTGRES_USER: artemis
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:?Set PROD_POSTGRES_PASSWORD in .env (see .env.example)}
+    # No published port: only the app container can reach the database. Use `just prod-psql` for a shell.
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    ports:
+      # Bound to one address only, so the app is reachable on that network interface and nowhere else.
+      - ${PROD_BIND_ADDRESS:-127.0.0.1}:${PROD_PORT:-5001}:8080
+    environment:
+      ConnectionStrings__Default: Host=postgres;Database=wheel_of_artemis;Username=artemis;Password=${PROD_POSTGRES_PASSWORD:?Set PROD_POSTGRES_PASSWORD in .env (see .env.example)};GSS Encryption Mode=Disable
+      SharedPassword__Username: ${PROD_USERNAME:?Set PROD_USERNAME in .env (see .env.example)}
+      SharedPassword__Password: ${PROD_PASSWORD:?Set PROD_PASSWORD in .env (see .env.example)}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

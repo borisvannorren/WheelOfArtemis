@@ -52,20 +52,6 @@ services:
       frontend:
         condition: service_started
 
-  # Production image (static frontend export served by .NET). Start with `just prod-up`.
-  app:
-    profiles: [prod]
-    build:
-      context: .
-      target: runtime
-    ports:
-      - 127.0.0.1:${PROD_APP_PORT:-5001}:8080
-    environment:
-      ConnectionStrings__Default: *connection-string
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   pgdata:
   nuget:

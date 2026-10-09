@@ -38,7 +38,7 @@ The .NET application is the leading application. It serves the API and the front
 ```
                         Development                                  Production (just prod-up)
 
- Browser ──▶ http://localhost:5000                         Browser ──▶ http://localhost:5001
+ Browser ──▶ http://localhost:5000                         Browser ──▶ http://<PROD_BIND_ADDRESS>:<PROD_PORT>
               │                                                         │
               ▼                                                         ▼
         ┌───────────────┐   /api, /health, /scalar           ┌──────────────────────────┐
@@ -49,14 +49,14 @@ The .NET application is the leading application. It serves the API and the front
         └───────────────┘          ▼         ▼               └────────────┬─────────────┘
                           ┌──────────────┐ ┌──────────┐                   ▼
                           │ frontend     │ │ postgres │              ┌──────────┐
-                          │ next dev     │ └──────────┘              │ postgres │
-                          └──────────────┘                           └──────────┘
+                          │ next dev     │ └──────────┘              │ postgres │  (own volume,
+                          └──────────────┘                           └──────────┘   no host port)
 ```
 
 - **Backend:** ASP.NET Core on .NET 10 with minimal APIs, EF Core with Npgsql, and OpenAPI with the Scalar UI (Development only). Migrations are applied automatically on startup. Unit tests use xUnit v3 on Microsoft.Testing.Platform.
 - **Frontend:** Next.js (App Router, TypeScript, Tailwind CSS), configured as a [static export](https://nextjs.org/docs/app/guides/static-exports). Pages fetch their data in the browser from `/api` on the same origin, so no CORS is needed.
 - **Development:** .NET forwards every request it does not handle itself to the Next.js dev server with [YARP](https://learn.microsoft.com/aspnet/core/fundamentals/servers/yarp/yarp-overview). Hot reload works for both: `dotnet watch` for the backend, and Next.js HMR through the proxy for the frontend.
-- **Production image:** a multi-stage `Dockerfile` builds the Next.js export, publishes the .NET app, and copies the export into the app's `wwwroot`. The result is one container.
+- **Production image:** a multi-stage `Dockerfile` builds the Next.js export, publishes the .NET app, and copies the export into the app's `wwwroot`. The result is one container. It runs as a separate Compose project with its own database, see [Hosting for the team](#hosting-for-the-team).
 - **Database:** PostgreSQL 18 in a Docker volume.
 
 Because the frontend is a static export, Next.js features that need a server are not available. These include server actions, request-time route handlers, rewrites, middleware/proxy and image optimisation. Anything dynamic belongs in the .NET API.
@@ -80,7 +80,7 @@ Then open:
 
 The first start takes a minute while images build and packages restore. Follow progress with `just logs`.
 
-Ports are set in `.env` (`APP_PORT`, `PROD_APP_PORT`, `POSTGRES_HOST_PORT`). Postgres is published on `127.0.0.1:5433` so it does not clash with other projects that use 5432.
+Ports are set in `.env` (`APP_PORT`, `POSTGRES_HOST_PORT`). The development database is published on `127.0.0.1:5433` so it does not clash with other projects that use 5432.
 
 ## Common commands
 
@@ -96,7 +96,8 @@ Run `just` to see all recipes. The ones you will use most:
 | `just migration-add <Name>` | Create an EF Core migration after changing the data model, and restart the backend so it is applied (`just migration-remove` undoes an unapplied one) |
 | `just psql` | Open a psql shell on the database |
 | `just db-reset` | Delete all data and start with an empty, migrated database |
-| `just prod-up` / `just prod-down` | Build and run the production image on port 5001 |
+| `just prod-up` / `just prod-down` | Build and start / stop the hosted production app, see [Hosting for the team](#hosting-for-the-team) |
+| `just prod-logs` / `just prod-psql` | Logs of / psql on the production app |
 
 Dev containers run as your own user, so files they create (such as `node_modules` and migrations) are owned by you, not by root. `node_modules` is installed into `frontend/` on the host, so your editor gets type information.
 
@@ -106,7 +107,8 @@ Don't run `next build` in `frontend/` while the dev stack is running: it shares 
 
 ```
 ├── Dockerfile               # All build stages: frontend-dev, frontend-build, backend-dev, backend-build, runtime
-├── docker-compose.yaml      # postgres, frontend, backend, and app (profile "prod")
+├── docker-compose.yaml      # Development: postgres, frontend, backend
+├── docker-compose.prod.yaml # Production hosting: app and its own postgres (separate project)
 ├── justfile                 # All project commands
 ├── backend/
 │   ├── WheelOfArtemis.slnx
@@ -129,11 +131,30 @@ Don't run `next build` in `frontend/` while the dev stack is running: it shares 
         └── lib/             # Typed fetch wrapper around /api, mission naming
 ```
 
+## Hosting for the team
+
+The production build can run on a team member's machine and be opened by colleagues on the network. It is a separate Compose project (`wheel-of-artemis-prod`) with its own database volume, so development commands such as `just down` and `just db-reset` never touch the real team data.
+
+1. Set the `PROD_*` values in `.env` (see `.env.example`):
+   - `PROD_BIND_ADDRESS` and `PROD_PORT`: the network address of the machine and the port, for example `10.80.0.34` and `777`. The app is published on that address only. Use `127.0.0.1` to keep it on your own machine.
+   - `PROD_USERNAME` and `PROD_PASSWORD`: one shared login for everyone. The browser asks for it once.
+   - `PROD_POSTGRES_PASSWORD`: password of the production database. Only the app container uses it.
+2. Run `just prod-up` and open `http://<PROD_BIND_ADDRESS>:<PROD_PORT>`.
+
+What to know:
+
+- **Availability:** both containers restart automatically after a reboot or a Docker restart, but the app is only reachable while the machine is on and connected to the network.
+- **Updating:** `just prod-up` builds from the files in your working copy, including uncommitted changes. Update from a clean, committed state (for example after `git pull`).
+- **The production database has no host port.** It cannot conflict with other projects; use `just prod-psql` to look inside.
+- **Login and transport:** the shared login keeps casual visitors out, but the app runs over plain HTTP, so the password and the data travel unencrypted on the network. Only `/health` is reachable without logging in.
+- **Firewall:** ports published by Docker bypass `ufw` rules on the host. Restrict access with the bind address and the login, not with `ufw`.
+- **Policy:** check whether hosting a service on a workstation fits the company's network and security policy before sharing the address widely.
+
 ## Data and privacy
 
 The app stores team members' names and which people were paired in which mission. It does **not** store any feedback content. Feedback stays between the buddies. A scrubbed mission is deleted, not hidden.
 
-The data lives in a Postgres volume on the machine that runs the app. The database and the app are bound to `127.0.0.1` and are not reachable from the network. Names and pairings of colleagues are personal data, even if low-risk. Keep the data to what the app needs, and run `just db-reset` to remove it when it is no longer needed.
+The data lives in Postgres volumes on the machine that runs the app. In development the database and the app are bound to `127.0.0.1` and are not reachable from the network. The hosted production app is reachable on the network, behind the shared login (see [Hosting for the team](#hosting-for-the-team)). Names and pairings of colleagues are personal data, even if low-risk. Keep the data to what the app needs. `just db-reset` removes the development data; to remove the production data, run `just prod-down` and delete the `wheel-of-artemis-prod_pgdata` volume.
 
 ## Theme
 
